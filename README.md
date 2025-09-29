@@ -1,8 +1,7 @@
 Perfect 👍 Now I understand exactly what you want: a **CAP Java Guide README** formatted like your **Flask Web Development Guide** example (with numbered Table of Contents, sections, code blocks, single-page).
 
 Here’s your CAP Java guide in that format:
-
-````markdown
+]
 # 📘 CAP Java Backend with SAP BTP Deployment
 
 ## Table of Contents
@@ -232,7 +231,7 @@ Open the app URL in the browser:
 
 You can now extend the app with more entities, services, and authentication!
 
-```
+
 
 Do you want me to also **add diagrams (architecture + deployment flow) in Markdown** like ASCII or Mermaid for GitHub rendering?
 ```
