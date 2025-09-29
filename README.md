@@ -221,6 +221,81 @@ Open the app URL in the browser:
 
 ---
 
+Thanks for sharing this build log 🙏 – this explains a lot.
+
+The important line is:
+
+```
+[INFO] GenerateMojo: No csn file found, skipping execution.
+```
+
+⚠️ That means the **CDS model (CSN file)** is missing → so the `cds-maven-plugin` cannot generate Java classes from your schema.
+
+---
+
+## 🔍 Why is CSN missing?
+
+* In **CAP Java**, the `.cds` files must be in the correct folder structure:
+
+  ```
+  srv/src/main/resources/db/schema.cds
+  srv/src/main/resources/srv/cat-service.cds
+  ```
+
+  or in the project root `db/` and `srv/` if using **CAP Node.js**.
+
+* The plugin expects to find them under `src/main/resources/`. If they are only in `/db/schema.cds` at root, they won’t be picked up.
+
+---
+
+## ✅ Fix
+
+1. Move your CDS files:
+
+   ```sh
+   mkdir -p srv/src/main/resources/db
+   mkdir -p srv/src/main/resources/srv
+   mv db/schema.cds srv/src/main/resources/db/
+   mv srv/cat-service.cds srv/src/main/resources/srv/
+   ```
+
+2. Clean & rebuild:
+
+   ```sh
+   mvn clean package
+   ```
+
+   Now the plugin should generate Java sources under:
+
+   ```
+   srv/src/gen/java/
+   ```
+
+3. If you want to check generation separately:
+
+   ```sh
+   mvn com.sap.cds:cds-maven-plugin:generate
+   ```
+
+   You should no longer see **“No csn file found”**.
+
+---
+
+## 🚀 After Fix
+
+* Build works → `.jar` is created in `srv/target/`
+* You can then build your MTAR:
+
+  ```sh
+  mbt build -p cf -t mta_archives
+  cf deploy mta_archives/my-cap-app_1.0.0.mtar
+  ```
+
+---
+
+👉 Do you want me to also give you a **ready-to-use `mta.yaml`** for this CAP Java bookstore app (with DB + service), so you can deploy without tweaking?
+
+
 ## Conclusion
 
 🎉 You have successfully:
