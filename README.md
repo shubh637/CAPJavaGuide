@@ -167,10 +167,6 @@ This process may take several minutes as it creates the HANA, XSUAA, and deploys
 
 ## 🔑 8. Testing (Secure API Access)
 
-
-
-### ✅ Step 8: Testing (Important)
-
 #### **Step 1. Get Your Credentials (Service Key) 🔑**
 
 1. In your **BTP Cockpit**, open your **Space**.
@@ -264,8 +260,6 @@ If everything is set up correctly, you’ll receive a response like:
 This confirms that your **API is live, secure, and successfully responding**.
 
 ---
-
-Would you like me to convert this into a **Markdown file (`TESTING.md`)** so you can include it directly in your project repo?
 
 
 # Now getting the data in the React 
