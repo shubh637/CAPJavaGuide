@@ -152,7 +152,7 @@ This process may take several minutes as it creates the HANA, XSUAA, and deploys
 
 -----
 
-## 🔎 7. Check BTP Space Status
+## 7. Check BTP Space Status
 
 After deployment, check your BTP Subaccount's Space for the deployed components:
 
@@ -163,52 +163,108 @@ After deployment, check your BTP Subaccount's Space for the deployed components:
 | `my-simple-api-auth` | **Created** (Service Instance) | Your XSUAA authentication instance. |
 
 -----
+## Step 8: Testing (Important)
 
-## 🔑 8. Testing (Secure API Access)
+Step 1. Get Your Credentials (Service Key) 🔑
 
-#7 Check BTP Space  
-Open you BTP Subaccount’s Space where you deployed and check for three instances
-my-simple-api-srv started 1/1:  This is your live API service.
-my-simple-api-db-deployer stopped 0/1:  This is also correct and expected. This app is a one-time task. Its only job is to create your tables in the HANA database. Once it successfully finishes that job, it automatically stops.
- 
-#8 Testing ( Important )
-1. Get Your Credentials (Service Key) 🔑
-In your BTP Cockpit, navigate to your space.
-In the left menu, click Instances.
-Find your authentication instance, which should be named my-simple-api-auth.
-Click the three dots (...) on the right side of that instance and select Create Service Key.
-Give the new key a name, like postman-key, and click Create.
-Once created, click the new key's name in the list to view its contents. You'll see a JSON structure. You only need three values from it:
+In your BTP Cockpit, open your Space.
+
+From the left-side menu, click Instances.
+
+Locate your authentication instance, usually named my-simple-api-auth.
+
+Click the three dots (⋯) beside it and choose Create Service Key.
+
+Give it a name — for example: postman-key.
+
+Click Create.
+
+Once created, click the key name to view its contents.
+
+You’ll see a JSON object similar to this:
+
+{
+  "clientid": "sb-xxxxxxxxxxxxxxxx",
+  "clientsecret": "abcdef1234567890",
+  "url": "https://<subdomain>.authentication.eu12.hana.ondemand.com"
+}
+
+
+Copy the following three values:
+
 clientid
-clientsecret
-url (this is the authentication URL)
- 
-2. Get the Access Token in Postman 🎟️
-Open Postman and create a new POST request.
-In the URL field, paste the url value from your service key and add /oauth/token to the end of it.
-Example: https://<...>.authentication.eu12.hana.ondemand.com/oauth/token
-Go to the Authorization tab.
-Set the Type to Basic Auth.
-For Username, paste your clientid.
-For Password, paste your clientsecret.
-Go to the Body tab.
-Select the x-www-form-urlencoded option.
-In the key-value editor, add a single entry:
-KEY: grant_type
-VALUE: client_credentials
-Click Send.
-The response will be a JSON object containing your access_token. Copy the long string of characters from the access_token value.
- 
-3. Call Your API 🚀
-Create another new request in Postman, this time a GET request.
-In the URL field, paste your application route and add the path to your service.
-URL: https://<….>.eu12.hana.ondemand.com/odata/v4/UserService/Users
-Go to the Authorization tab.
-Set the Type to Bearer Token.
-In the Token field on the right, paste the access_token you copied in the previous step.
-Click Send.
-You should now get a 200 OK status and see the familiar JSON response with the empty value array. This confirms your API is live, secure, and working correctly
 
+clientsecret
+
+url
+
+Step 2. Get an Access Token in Postman 
+
+Open Postman → Create a new POST request.
+
+In the URL, paste your url value and append /oauth/token.
+
+Example:
+
+https://<subdomain>.authentication.eu12.hana.ondemand.com/oauth/token
+
+
+Go to the Authorization tab:
+
+Type: Basic Auth
+
+Username: clientid
+
+Password: clientsecret
+
+Go to the Body tab:
+
+Select x-www-form-urlencoded
+
+Add the following key–value pair:
+
+Key	Value
+grant_type	client_credentials
+
+Click Send.
+
+If successful, you’ll receive a JSON response like this:
+
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCIg...",
+  "token_type": "bearer",
+  "expires_in": 43199
+}
+
+
+#### Copy the long string under access_token — you’ll use it next.
+
+Step 3. Call Your API 
+
+In Postman, create a new GET request.
+
+Use your application route followed by your service path:
+
+https://<your-app>.cfapps.eu12.hana.ondemand.com/odata/v4/UserService/Users
+
+
+Go to the Authorization tab:
+
+Type: Bearer Token
+
+Token: (paste your access_token here)
+
+Click Send.
+
+If everything is set up correctly, you’ll receive a response like:
+
+{
+  "value": []
+}
+
+
+#### Status: 200 OK
+This confirms that your API is live, secure, and successfully responding.
 
 # Now getting the data in the React 
 That's a comprehensive setup\! You've successfully integrated XSUAA authentication into a React Native frontend and implemented the necessary CORS/Security fixes on your CAP Java backend.
