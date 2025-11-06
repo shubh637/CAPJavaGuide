@@ -166,47 +166,48 @@ After deployment, check your BTP Subaccount's Space for the deployed components:
 
 ## 🔑 8. Testing (Secure API Access)
 
-Since the service is secured by XSUAA, you must obtain an **Access Token** before calling the API.
-
-### 1\. Get Your Credentials (Service Key) 🔑
-
-1.  Navigate to your **BTP Cockpit** $\rightarrow$ **Space**.
-2.  In the left menu, click **Instances**.
-3.  Find your authentication instance, which should be named **`my-simple-api-auth`**.
-4.  Click the three dots **(...)** and select **Create Service Key**.
-5.  Name the key (e.g., `postman-key`) and click **Create**.
-6.  View the key's $\text{JSON}$ content and extract these three values:
-      * `clientid`
-      * `clientsecret`
-      * `url` (the authentication URL)
-
-### 2\. Get the Access Token in Postman 🎟️
-
-1.  Open **Postman** and create a new **POST** request.
-2.  **URL:** Paste the `url` value from your service key and append $\mathbf{/oauth/token}$.
-      * *Example:* `https://<...>.authentication.eu12.hana.ondemand.com/oauth/token`
-3.  **Authorization Tab:**
-      * Set **Type** to **Basic Auth**.
-      * **Username:** Paste your `clientid`.
-      * **Password:** Paste your `clientsecret`.
-4.  **Body Tab:**
-      * Select the **x-www-form-urlencoded** option.
-      * Add a single entry: $\mathbf{KEY: \text{grant\_type}}$, $\mathbf{VALUE: \text{client\_credentials}}$.
-5.  Click **Send**.
-6.  In the response, copy the value of the $\mathbf{access\_token}$.
-
-### 3\. Call Your API 🚀
-
-1.  Create another new request in Postman, a **GET** request.
-2.  **URL:** Paste your application route (from your BTP space) and append the service path.
-      * *Example:* `https://<my-api-route>.cfapps.eu12.hana.ondemand.com/odata/v4/UserService/Users`
-3.  **Authorization Tab:**
-      * Set **Type** to **Bearer Token**.
-      * In the **Token** field, paste the $\mathbf{access\_token}$ you copied.
-4.  Click **Send**.
-
-You should now receive a $\mathbf{200~OK}$ status and the empty $\text{JSON}$ array, confirming your deployed API is live, secure, and accessible with proper authorization.
-
+#7 Check BTP Space  
+Open you BTP Subaccount’s Space where you deployed and check for three instances
+my-simple-api-srv started 1/1:  This is your live API service.
+my-simple-api-db-deployer stopped 0/1:  This is also correct and expected. This app is a one-time task. Its only job is to create your tables in the HANA database. Once it successfully finishes that job, it automatically stops.
+ 
+#8 Testing ( Important )
+1. Get Your Credentials (Service Key) 🔑
+In your BTP Cockpit, navigate to your space.
+In the left menu, click Instances.
+Find your authentication instance, which should be named my-simple-api-auth.
+Click the three dots (...) on the right side of that instance and select Create Service Key.
+Give the new key a name, like postman-key, and click Create.
+Once created, click the new key's name in the list to view its contents. You'll see a JSON structure. You only need three values from it:
+clientid
+clientsecret
+url (this is the authentication URL)
+ 
+2. Get the Access Token in Postman 🎟️
+Open Postman and create a new POST request.
+In the URL field, paste the url value from your service key and add /oauth/token to the end of it.
+Example: https://<...>.authentication.eu12.hana.ondemand.com/oauth/token
+Go to the Authorization tab.
+Set the Type to Basic Auth.
+For Username, paste your clientid.
+For Password, paste your clientsecret.
+Go to the Body tab.
+Select the x-www-form-urlencoded option.
+In the key-value editor, add a single entry:
+KEY: grant_type
+VALUE: client_credentials
+Click Send.
+The response will be a JSON object containing your access_token. Copy the long string of characters from the access_token value.
+ 
+3. Call Your API 🚀
+Create another new request in Postman, this time a GET request.
+In the URL field, paste your application route and add the path to your service.
+URL: https://<….>.eu12.hana.ondemand.com/odata/v4/UserService/Users
+Go to the Authorization tab.
+Set the Type to Bearer Token.
+In the Token field on the right, paste the access_token you copied in the previous step.
+Click Send.
+You should now get a 200 OK status and see the familiar JSON response with the empty value array. This confirms your API is live, secure, and working correctly
 
 
 # Now getting the data in the React 
