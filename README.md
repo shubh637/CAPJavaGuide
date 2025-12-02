@@ -11,7 +11,7 @@ This guide is based on capire documentation : https://cap.cloud.sap/docs/guides/
 
 1. S4 Hana Cloud instance available in your space where you will deploy your application 
 
-![Screenshot 2025-11-16 at 8.07.54 PM.png](attachment:72253e72-2c50-492d-a4b9-d966c5a68128:Screenshot_2025-11-16_at_8.07.54_PM.png)
+![Screenshot 2025-11-16 at 8.07.54 PM.png](https://github.com/shubh637/CAPJavaGuide/blob/main/Screenshot2025-11-16at8.07.54P.jpeg)
 
 ## Set Up
 
