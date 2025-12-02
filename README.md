@@ -1,666 +1,906 @@
-This guide outlines the process of creating a simple CAP (Cloud Application Programming Model) Java API and deploying it to the SAP Business Technology Platform (BTP) using best practices.
+# Steps to deploy a role based app in BTP with a React UI
 
-## 🚀 CAP Java API Creation and BTP Deployment Guide
+<aside>
+📎
 
-This guide details the steps to create a simple CAP Java service with a HANA database and secure it using XSUAA for deployment on SAP BTP.
+This guide is based on capire documentation : https://cap.cloud.sap/docs/guides/deployment/to-cf#cf-cli
 
------
+</aside>
 
-## 📋 1. Prerequisites Check
+## Requirements
 
-Before starting, ensure all necessary development tools are installed and correctly configured.
+1. S4 Hana Cloud instance available in your space where you will deploy your application 
 
-| Tool | Command | Expected Output Status |
-| :--- | :--- | :--- |
-| **Java** (JDK 17 LTS) | `java -version` | **PASS** (SapMachine 17.0.16) |
-| **Maven** | `mvn -version` | **PASS** (Apache Maven 3.9.11) |
-| **Node.js** | `node -v` | **PASS** (v20.19.5) |
-| **npm** | `npm -v` | **PASS** (10.8.2) |
-| **CAP CDS SDK** | `cds --version` | **PASS** (@sap/cds: 9.2.1) |
-| **Cloud Foundry CLI** | `cf --version` | **PASS** (cf version 8.14.1) |
-| **MTA Build Tool** | `mbt --version` | **PASS** (version 1.2.34) |
+![Screenshot 2025-11-16 at 8.07.54 PM.png](attachment:72253e72-2c50-492d-a4b9-d966c5a68128:Screenshot_2025-11-16_at_8.07.54_PM.png)
 
-> **Note:** The Java and Maven Java versions are confirmed to be consistent and from a supported vendor (SAP SE), which is ideal for CAP Java development.
+## Set Up
 
------
-
-## 🛠️ 2. Create Your CAP Project
-
-Initialize a new CAP project and specify the **`java`** feature to set up the Spring Boot environment.
+Open the folder where you want your project to be set up in VS code and use the following commands
 
 ```bash
-# Initialize the project and add the 'java' template
-cds init my-simple-api --add java
-
-# Navigate into the new project directory
-cd my-simple-api
+cds init <app-name> --add java 
+cd bookshop
+**npm i -g @sap/cds-dk 
+npm i -g mbt
+cf add-plugin-repo CF-Community https://plugins.cloudfoundry.org
+cf install-plugin -f multiapps
+cf install-plugin -f html5-plugin**
 ```
 
------
-
-## 📦 3. Define the Data Model and Service
-
-### Data Model (`db/schema.cds`)
-
-Create the data structure for the `Users` entity in the `db/schema.cds` file.
-
-```cds
-namespace my.simple.api;
-
-entity Users {
-  key ID         : UUID;
-  firstName      : String(50);
-  lastName       : String(50);
-  email          : String(100);
-}
-```
-
-### Service Definition (`srv/service.cds`)
-
-Expose the `Users` entity via an OData service by creating the `srv/service.cds` file.
-
-```cds
-using { my.simple.api as db } from '../db/schema';
-
-service UserService {
-    entity Users as projection on db.Users;
-}
-```
-
------
-
-## 🧪 4. Run and Test Locally
-
-Use Maven to compile and run the CAP Java service locally.
+## Prepare for Deployment
 
 ```bash
-# Compile and run the Spring Boot application
-mvn spring-boot:run
-```
-
-Once the application starts, open your browser or a tool like Postman and check the OData endpoint:
-
-$$\text{http://localhost:8080/odata/v4/UserService/Users}$$
-
-You should receive a successful $\text{JSON}$ response with an empty array:
-
-```json
-{
-  "@odata.context": "$metadata#Users",
-  "value": []
-}
-```
-
-Press $\text{Ctrl} + \text{C}$ in the terminal to stop the running server.
-
------
-
-## ☁️ 5. Prepare for BTP Deployment
-
-Configure the project for deployment to the SAP BTP Cloud Foundry environment using the **Multi-Target Application (MTA)** format.
-
-> **Prerequisite:** Ensure you have an SAP BTP subaccount with the **SAP HANA Cloud (HANA plan)** subscribed, and a dedicated **space** created for deployment.
-
-```bash
-# Add the Multi-Target Application (MTA) file
-cds add mta
-
-# Add the HANA deployment configuration
 cds add hana
-
-# Add the XSUAA security configuration
 cds add xsuaa
+cds add mta
+cds add approuter
+cds add app-front
 ```
 
-The `mta.yaml` file now includes configurations to orchestrate the creation of three essential BTP components:
+go to app/router/ and create a resources folder.
 
-1.  **`my-simple-api-srv`**: Your Java service application.
-2.  **`my-simple-api-db-deployer`**: The app responsible for creating tables in the HANA database.
-3.  **`my-simple-api-uaa`**: The XSUAA service instance for authentication and authorization.
-
------
-
-## 📤 6. Build and Deploy
-
-### Build the MTA Archive
-
-The `mbt build` command compiles the service and bundles all components into a deployable MTA archive (`.mtar`).
+update app/ui/frontend/package.json
 
 ```bash
-mbt build
+  .......
+  .......
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build && npm run copy-build",
+    "copy-build": "rm -rf ../../router/resources && mkdir -p ../../router/resources && cp -r build/* ../../router/resources/",
+    ....
+    ....
+    ...
+    }
 ```
 
-The resulting file will be located in the `mta_archives` folder (e.g., `mta_archives/my-simple-api_1.0.0-SNAPSHOT.mtar`).
-
-### Login to Cloud Foundry
-
-Log in to your target BTP space using the Cloud Foundry command-line interface.
+update package.json in root folder
 
 ```bash
-cf login
+"scripts": {
+    "stage":"cd app/ui/frontend && npm run build && cd ../../..",
+     "deploy": "mbt build && cf deploy mta_archives/*.mtar --retries 1"
+  }
 ```
 
-### Deploy the MTA
+Now make changes in the xs-security.json in root directory
 
-Use the Cloud Foundry CLI to deploy the generated MTA archive.
-
-```bash
-cf deploy mta_archives/my-simple-api_1.0.0-SNAPSHOT.mtar
-```
-
-This process may take several minutes as it creates the HANA, XSUAA, and deploys your service.
-
------
-
-### ✅ Step 7: Check Your BTP Space
-
-1. Open your **BTP Subaccount → Space** where the project was deployed.
-2. Verify that you have **three application instances**:
-
-| Instance Name                 | Status             | Description                                                                                                                        |
-| ----------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **my-simple-api-srv**         | 🟢 *Started (1/1)* | Your **live API service** – this is what you'll call from Postman.                                                                 |
-| **my-simple-api-db-deployer** | ⚪️ *Stopped (0/1)* | This is **expected**. It’s a one-time deployer that creates your database tables. After finishing its job, it automatically stops. |
-| **my-simple-api-auth**        | 🟢 *Started (1/1)* | Your **authentication service** – used to generate secure access tokens.                                                           |
-
----
-
-## 🔑 8. Testing (Secure API Access)
-
-#### **Step 1. Get Your Credentials (Service Key) 🔑**
-
-1. In your **BTP Cockpit**, open your **Space**.
-2. From the left-side menu, click **Instances**.
-3. Locate your **authentication instance**, usually named `my-simple-api-auth`.
-4. Click the **three dots (⋯)** beside it and choose **Create Service Key**.
-5. Give it a name — for example: `postman-key`.
-6. Click **Create**.
-7. Once created, click the key name to view its contents.
-
-You’ll see a **JSON object** similar to this:
-
-```json
+```jsx
 {
-  "clientid": "sb-xxxxxxxxxxxxxxxx",
-  "clientsecret": "abcdef1234567890",
-  "url": "https://<subdomain>.authentication.eu12.hana.ondemand.com"
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.admin",
+      "description": "admin"
+    }
+  ],
+  "attributes": [],
+  "role-templates": [
+    {
+      "name": "admin",
+      "description": "generated",
+      "scope-references": [
+        "$XSAPPNAME.admin"
+      ],
+      "attribute-references": []
+    }
+  ]
 }
+
 ```
 
-👉 Copy the following three values:
+go to app/router/xs-app.json and make changes
 
-* `clientid`
-* `clientsecret`
-* `url`
-
----
-
-#### **Step 2. Get an Access Token in Postman 🎟️**
-
-1. Open **Postman** → Create a **new POST request**.
-2. In the **URL**, paste your `url` value and append `/oauth/token`.
-
-   Example:
-
-   ```
-   https://<subdomain>.authentication.eu12.hana.ondemand.com/oauth/token
-   ```
-3. Go to the **Authorization** tab:
-
-   * **Type:** `Basic Auth`
-   * **Username:** `clientid`
-   * **Password:** `clientsecret`
-4. Go to the **Body** tab:
-
-   * Select **x-www-form-urlencoded**
-   * Add the following key–value pair:
-
-     | Key          | Value                |
-     | ------------ | -------------------- |
-     | `grant_type` | `client_credentials` |
-5. Click **Send**.
-
-If successful, you’ll receive a **JSON response** like this:
-
-```json
+```jsx
 {
-  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCIg...",
-  "token_type": "bearer",
-  "expires_in": 43199
-}
-```
-
-👉 Copy the long string under **`access_token`** — you’ll use it next.
-
----
-
-#### **Step 3. Call Your API 🚀**
-
-1. In Postman, create a **new GET request**.
-2. Use your application route followed by your service path:
-
-   ```
-   https://<your-app>.cfapps.eu12.hana.ondemand.com/odata/v4/UserService/Users
-   ```
-3. Go to the **Authorization** tab:
-
-   * **Type:** `Bearer Token`
-   * **Token:** *(paste your `access_token` here)*
-4. Click **Send**.
-
-If everything is set up correctly, you’ll receive a response like:
-
-```json
-{
-  "value": []
-}
-```
-
-✅ **Status: 200 OK**
-This confirms that your **API is live, secure, and successfully responding**.
-
----
-
-
-# Now getting the data in the React 
-That's a comprehensive setup\! You've successfully integrated XSUAA authentication into a React Native frontend and implemented the necessary CORS/Security fixes on your CAP Java backend.
-
-Here is the complete GitHub README file, including the file structure, setup instructions, and the code snippets for both the frontend and backend.
-
------
-
-# 🚀 Full-Stack CAP Java & React Native Integration
-
-This project demonstrates a secure communication flow between a **React Native** (Frontend) client running on `localhost` and a **CAP Java Service** (Backend) deployed on SAP BTP Cloud Foundry, secured by **XSUAA** using the Client Credentials Flow.
-
-## 📁 Project Structure
-
-The solution involves changes in two main areas: the React Native project (for authentication and UI) and the CAP Java service (for security and CORS).
-
-```
-.
-├── capJavaBackend/
-│   ├── srv/
-│   │   ├── src/
-│   │   │   ├── main/
-│   │   │   │   ├── java/
-│   │   │   │   │   └── customer/my_api/
-│   │   │   │   │       ├── WebConfig.java       <-- 1. CORS Policy
-│   │   │   │   │       └── SecurityConfig.java  <-- 2. Security Bypass (Fixes 401)
-│   │   │   │   └── resources/
-│   │   │   │       └── application.yaml       <-- No security configs here
-│   │   └── pom.xml                            <-- Spring Security dependencies added here
-│   └── mta.yaml
-└── reactNativeFrontend/
-    └── myApp/
-        ├── app/
-        │   ├── index.js                     <-- 3. Main UI and API calls
-        │   └── authService.js               <-- 4. XSUAA Token Retrieval (Client Credentials)
-        ├── package.json                     <-- Dependencies: react-native, base-64
-        └── xsuaaConfig.js                   <-- 5. Hardcoded Client Secrets (DEV ONLY)
-```
-
-## 1\. Backend Setup (CAP Java Service)
-
-The Java service must be updated to resolve the Cross-Origin Resource Sharing (CORS) preflight $\mathbf{401}$ error encountered when connecting from `localhost`.
-
-### A. Dependencies (`srv/pom.xml`)
-
-Ensure you have the required Spring Security and CAP Security starters:
-
-```xml
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-security</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>com.sap.cds</groupId>
-        <artifactId>cds-starter-spring-security</artifactId>
-    </dependency>
-    </dependencies>
-```
-
-### B. Security Bypass (`srv/src/main/java/customer/my_api/SecurityConfig.java`)(don't do it if don't want to bypass the security).
-
-This is the **CRITICAL FIX**. It allows the unauthenticated $\text{OPTIONS}$ request to pass the XSUAA filter.
-
-```java
-package customer.my_api;
-
-import org.springframework.context.annotation.Configuration;
-// ... other imports for SecurityFilterChain, HttpMethod, etc.
-
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "route",
+  "routes": [
+    {
+      "source": "^/odata/v4/(.*)$",
+      "target": "/odata/v4/$1",
+      "destination": "hpsmt-srv-api",//set this according to the mta.yaml file
+      "authenticationType": "xsuaa",
+      "csrfProtection":true
+    },
+    {
+      "source": "^/user-api/currentUser$",
+      "target": "/user-api/currentUser",
+      "service": "sap-approuter-userapi",
+      "authenticationType": "xsuaa"
+    },
+    {
+      "source": "^(.*)$",
+      "localDir": "resources"
+    }    
     
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .authorizeHttpRequests(auth -> auth
-                // Use requestMatchers for Spring Security 6+ syntax
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() 
-                .anyRequest().authenticated()
-            )
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt())
-            .cors() // Integrate the WebConfig bean
-            .and().csrf().disable();
-            
-        return http.build();
-    }
+    
+    
+  ]
+}
+
+```
+
+## Modify
+
+We don’t need the complete sample, so we will start by making it simpler 
+
+1. Change db/schema.cds
+
+```bash
+namespace my.hpsmt;
+using { managed } from '@sap/cds/common';
+
+entity Users:managed{
+  key ID : UUID;
+  name : String;
+  email : String;
+  role : String; // 'User' or 'Manager'
+  isActive : Boolean;
+}
+
+entity Teams:managed{
+  key ID : UUID;
+  name : String;
+  description : String;
+  manager : Association to Users;
+  
+}
+
+entity TeamMembers{
+  key ID : UUID;
+  team : Association to Teams;
+  user : Association to Users;
 }
 ```
 
-### C. CORS Policy (`srv/src/main/java/customer/my_api/WebConfig.java`)
+1. Change srv/admin-service.cds
 
-This defines which origins (`localhost:8081`) are allowed access.
-
-```java
-package customer.my_api;
-
-import org.springframework.context.annotation.Configuration;
-// ... imports
-
-@Configuration
-public class WebConfig {
- 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:8081",
-            "http://localhost:19006",
-            // Replace with your exact deployed service URL
-            "https://jps-hpwyvuj0-space1-my-api-srv.cfapps.eu12.hana.ondemand.com"
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*")); 
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+```bash
+using {my.hpsmt as h} from '../db/schema';
+service AdminService @(requires : 'admin'){
+    entity Users as projection on h.Users;
+    entity Teams as projection on h.Teams;
+    entity TeamMembers as projection on h.TeamMembers;
 }
 ```
 
-### D. Deployment
+1. Change srv/core-service.cds
 
-1.  Build the project: `mvn clean package -DskipTests=true`
-2.  Redeploy the MTA: `mbt build` then `cf deploy <archive>.mtar`
-
------
-
-## 2\. Frontend Setup (React Native App)
-
-The frontend requires two files for authentication and the main UI logic.
-
-### A. Configuration (`myApp/xsuaaConfig.js`)
-
-**⚠️ Development Only:** Never use this in production. Get these values from your XSUAA Service Key.
-
-```javascript
-// myApp/xsuaaConfig.js
-const XSUAA_CONFIG = {
-  tokenUrl: "https://<your-xsuaa-host>/oauth/token", 
-  clientId: "<your-clientid>", 
-  clientSecret: "<your-clientsecret>"
-};
-export default XSUAA_CONFIG;
+```bash
+using {my.hpsmt as h} from '../db/schema';
+service CoreService{
+    @readonly
+    entity Users as projection on h.Users;
+    @readonly
+    entity Teams as projection on h.Teams;
+    @readonly
+    entity TeamMembers as projection on h.TeamMembers;
+}
 ```
 
-### B. Authentication Service (`myApp/authService.js`)
+## Create a Frontend
 
-This file fetches the XSUAA token using the Client Credentials Grant Flow.
+```bash
+mkdir app/ui
+cd app/ui
+npx create-react-app frontend
+```
 
-```javascript
-// myApp/authService.js
-import base64 from 'base-64'; 
-import XSUAA_CONFIG from './xsuaaConfig'; 
+This will create a frontend starting template.
 
-const { tokenUrl, clientId, clientSecret } = XSUAA_CONFIG;
+Create file app/ui/frontend/src/GlobalConstant.js
 
-export const getAccessToken = async () => {
-  try {
-    // 1. Prepare Basic Auth header
-    const credentials = `${clientId}:${clientSecret}`;
-    // Use base64.encode() if you imported the library, or btoa() if available globally
-    const encodedCredentials = base64.encode(credentials); 
+this file is to create the csrf token and use it globally
 
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: {
-        // 2. Set Basic Auth and Content Type
-        'Authorization': `Basic ${encodedCredentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      // 3. Set grant type for Client Credentials Flow
-      body: 'grant_type=client_credentials',
+```jsx
+
+import { createContext, useContext, useState } from "react";
+
+//creating the context
+const AppContext = createContext(null);
+
+//exporting so we can use AppContext.
+export const useAppContext = () => useContext(AppContext);
+
+export const AppProvider = ({ children }) => {
+  const [token, setToken] = useState(null);
+
+  const ADMIN_BASE = "/odata/v4/AdminService";//base url for the csrf token generation chaneg according to service..
+  const fetchCsrfToken = async () => {
+    const res = await fetch(`${ADMIN_BASE}/`, {
+      method: "GET",
+      credentials: "include",
+      headers: { "X-CSRF-Token": "Fetch" },
     });
 
-    const json = await response.json();
+    if (!res.ok) throw new Error("Failed to fetch CSRF token");
 
-    // Check for HTTP errors before trying to read the token
-    if (!response.ok) {
-        // This captures errors like 401 Bad Credentials, 400 Bad Request, etc.
-        throw new Error(`HTTP Error: ${response.status} - ${json.error_description || json.error || 'Unknown error'}`);
-    }
- 
-    if (json.access_token) {
-      console.log('Successfully fetched new access token!');
-      return json.access_token;
-    } else {
-      // This is the fallback if response.ok is true but token is missing
-      throw new Error('Failed to fetch access token: Token field missing in response.');
-    }
+    const csrf = res.headers.get("X-CSRF-Token");
+    if (!csrf) throw new Error("No CSRF token returned");
 
-  } catch (error) {
-    console.error("Error fetching access token:", error.message || error);
-    // Returning null will cause the subsequent API call to fail, which is correct behavior
-    return null; 
-  }
-};
-```
-
-### C. Main UI (`myApp/app/index.js`)
-
-This is your main React Native component, which initializes the token and performs the secured $\text{GET}$ and $\text{POST}$ requests.
-
-```javascript
-// myApp/app/index.js
-
-import React, { useState, useEffect } from 'react';
-// ... other imports
-
-import { getAccessToken } from '../authService'; 
- 
-const API_URL = 'https://jps-hpwyvuj0-space1-my-api-srv.cfapps.eu12.hana.ondemand.com/odata/v4/UserService/Users';
-
-export default function HomeScreen() {
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
-  // ... rest of state variables
-
-  useEffect(() => {
-    // Initialization logic to fetch token
-    const initialize = async () => {
-      const fetchedToken = await getAccessToken();
-      if (fetchedToken) {
-        setToken(fetchedToken);
-      } else {
-        Alert.alert('Authentication Failed', 'Could not retrieve access token.');
-        setLoading(false);
-      }
-    };
-    initialize();
-  }, []);
- 
-  useEffect(() => {
-    // Fetch users after token is successfully set
-    if (token) {
-      fetchUsers();
-    }
-  }, [token]);
- 
-  const fetchUsers = async () => {
-    // ... (Your fetchUsers logic using Authorization: Bearer ${token})
+    setToken(csrf);
+    return csrf;
   };
- 
-  const handleSaveUser = async () => {
-    // ... (Your handleSaveUser logic using Authorization: Bearer ${token})
-  };
- 
+
   return (
-    // ... (Your JSX component rendering form and list)
+    <AppContext.Provider
+      value={{ token, setToken, ADMIN_BASE, fetchCsrfToken }}
+    >
+      {children}
+    </AppContext.Provider>
   );
-}
-// ... (Your StyleSheet.create)
+};
+
 ```
 
-# Deploying the frontend to the BTP.
+go to app/ui/frontend/src/index.js
 
-Understood. Here is the complete, consolidated deployment guide for your **Frontend Project (Expo Web)**, formatted for a **GitHub README** or a dedicated **`DEPLOYMENT.md`** file.
+```jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import "./index.css";
+import App from "./App";
+import reportWebVitals from "./reportWebVitals";
+import { AppProvider } from "./GlobalConstant";
 
-This format provides the necessary file structures and commands for quick implementation.
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(
+  <React.StrictMode>
+    <AppProvider> //wrap the main App component with the AppProvider to access global variable..
+      <App />
+    </AppProvider>
+  </React.StrictMode>
+);
 
------
-
-# 🚀 Frontend Deployment Guide: Expo Web to SAP BTP
-
-This guide details the steps to deploy your compiled Expo Web application to the SAP BTP Cloud Foundry environment, including essential fixes for NGINX configuration (MIME type) and final linking to your backend service.
-
-## I. Build and Configuration Setup
-
-Execute these commands from your **frontend project's root directory**. This creates the necessary build output and the custom NGINX directory structure required by the Staticfile Buildpack.
-
-```bash
-# 1.1 Build Static Assets (Generates 'web-build')
-npx expo export -p web --output-dir web-build
-
-# 1.2 Create NGINX Configuration Structure inside the build folder
-mkdir -p web-build/nginx/conf/includes
-
-# 1.3 Create NGINX Fix File
-touch web-build/nginx/conf/includes/mime_fix.conf
+reportWebVitals();
 ```
 
-## II. Configuration Files
+Edit the frontend/src/App.js
 
-### 2.1. `web-build/Staticfile`
+```jsx
+import React, { useState, useEffect } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { useAppContext } from "./GlobalConstant";//import the global constants.
+import "./App.css";
 
-This file enables **pushstate** (for client-side routing) and tells NGINX to load our custom includes.
+const App = () => {
+  const ADMIN_API = "/odata/v4/AdminService"; 
+  const USER_API = "/odata/v4/CoreService";
+  const { token, fetchCsrfToken } = useAppContext();//using token from global constant.
 
-```text
-# File: web-build/Staticfile
+  const [userInfo, setUserInfo] = useState(null);//store current user information.
+  const [admin, setAdmin] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-root: .
-pushstate: enabled
-location_include: includes/*.conf
-```
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    role: "USER",
+    isActive: "true",
+  });
+  
+   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState(null);
 
-### 2.2. `web-build/nginx/conf/includes/mime_fix.conf`
+  const [users, setUsers] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState(null);
 
-This critical fix resolves the browser's **MIME type error** by forcing the correct header for JavaScript assets.
-
-```nginx
-# File: web-build/nginx/conf/includes/mime_fix.conf
-
-# Fix MIME types for JavaScript files explicitly
-location ~* \.js$ {
-    add_header Content-Type application/javascript;
-}
-```
-
-### 2.3. `manifest.yml` (Frontend Root)
-
-This file defines the application's resources and ensures it gets a **unique route** separate from your backend.
-
-```yaml
-# File: frontend_root/manifest.yml
-
-applications:
-- name: my-expo-frontend       # Unique App Name
-  memory: 256M                 # Recommended memory
-  disk_quota: 256M             
-  path: ./web-build            # Path to the static assets
-  buildpacks:
-    - staticfile_buildpack     # Use NGINX for static serving
-  routes:
-    # Generates a unique route (e.g., my-expo-frontend-WORD.cfapps.eu12.hana.ondemand.com)
-    - route: my-expo-frontend.${CF_DEFAULT_DOMAIN} 
-```
-
-## III. Deployment and Final Linking
-
-### 3.1. Initial Deployment
-
-Push the application to establish its route and base files.
-
-```bash
-cf push 
-```
-
-### 3.2. Backend Configuration (Prerequisite)
-
-Before proceeding, ensure your **CAP Java Backend** has been deployed (Step 3.2 is complete) and that its `WebConfig.java` file contains the **frontend's deployed URL** in the `setAllowedOrigins` list to prevent CORS errors.
-
-### 3.3. Final Linkage and Redeployment
-
-Retrieve your backend's URL, update the frontend's configuration, and push the final, linked version.
-
-```bash
-//for the successfull retrival add the url to backend WebConfig.js.
-package customer.my_api;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import java.util.Arrays;
-
-@Configuration
-public class WebConfig {
- 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-
-        CorsConfiguration configuration = new CorsConfiguration();
-
-        // 1. Explicitly allow ALL origins where the request might originate (i.e., your frontends)
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:8081",
-            "http://localhost:19006",
-            
-            // CRITICAL FIX: Only include the FRONTEND'S URL here. 
-            // The request originates from this domain.
-            "https://my-expo-frontend.cfapps.eu12.hana.ondemand.com"
-        ));
-
-        // 2. Allow all necessary methods (including OPTIONS for preflight)
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"));
-        
-        // 3. Allow all headers (Authorization, Content-Type, etc.)
-        configuration.setAllowedHeaders(Arrays.asList("*")); 
-        
-        // 4. Allow credentials for BTP security flow
-        configuration.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Apply this configuration to all paths
-        source.registerCorsConfiguration("/**", configuration);
-        
-        return source;
+  const ROLES = [
+    { value: "USER", label: "User" },
+    { value: "MANAGER", label: "Manager" },
+   
+  ];
+  
+  //---------------------------CHECK ADMIN--------------------------------------
+  // Check if user is admin
+  const checkAdmin = async () => {
+    try {
+      const res = await fetch(`${ADMIN_API}/Users?$top=1`, {
+        credentials: "include",
+      });
+      setAdmin(res.ok);
+    } catch {
+      setAdmin(false);
     }
-}
+  };
+  
+  //---------------------------FETCH CURRENT USER INFO--------------------------------------
+  
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch("/user-api/currentUser", {
+        credentials: "include",
+      });
+      if (res.ok) setUserInfo(await res.json());
+    } catch (err) {
+      console.error(err);
+    }
+  };  
+  
+  //---------------------------FETCH USERS--------------------------------------
+  
+  const fetchUsers = async () => {
+    setListLoading(true);
+    try {
+      const res = await fetch(`${USER_API}/Users`, { credentials: "include" });
+      const data = await res.json();
+      setUsers((data.value || []).sort((a, b) => b.ID - a.ID));
+    } catch (err) {
+      setListError(err.message);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+    fetchCurrentUser();
+    fetchCsrfToken();
+    checkAdmin();
+  }, []);
+  
+  
+   //---------------------------POST DATA TO USERS--------------------------------------
+  
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Create / Update User
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage(null);
+
+    const payload = { ...form, isActive: form.isActive === "true" };
+
+    try {
+      const method = editingId ? "PATCH" : "POST";
+      const url = editingId
+        ? `${ADMIN_API}/Users(${editingId})`
+        : `${ADMIN_API}/Users`;
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": token,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      //if (!res.ok) throw new Error("Failed to save user");
+      if (!res.ok) {
+        let errorMessage = "Failed to save user";
+
+        try {
+          const errorBody = await res.json();
+          if (errorBody?.error?.message) {
+            errorMessage = errorBody.error.message;
+          }
+        } catch (e) {
+          // ignore JSON parse error
+        }
+
+        throw new Error(errorMessage);
+      }
+      setMessage({
+        type: "success",
+        text: editingId ? "User Updated" : "User Created",
+      });
+
+      fetchUsers();
+      setEditingId(null);
+      setForm({ name: "", email: "", role: "USER", isActive: "true" });
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };  
+  
+  
+  
+    //--------------------------DELETE USER----------------------------------
+  const deleteUser = async (id) => {
+    if (!window.confirm("Delete this user?")) return;
+    try {
+      const res = await fetch(`${ADMIN_API}/Users(${id})`, {
+        method: "DELETE",
+        headers: { "X-CSRF-Token": token },
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      fetchUsers();
+    } catch (err) {
+      setMessage({ type: "error", text: err.message });
+    }
+  };
+  
+  //---------------------------Edit user (prefill form)-------------------------------
+  const startEdit = (u) => {
+    setEditingId(u.ID);
+    setForm({
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      isActive: u.isActive ? "true" : "false",
+    });
+  };
+
+  // UI: Message
+  const MessageDisplay = ({ message }) => {
+    if (!message) return null;
+    return (
+      <div
+        className={`msg ${message.type === "success" ? "msg-success" : "msg-error"
+          }`}
+      >
+        {message.text}
+      </div>
+    );
+  };
+
+  //--------------------------------- LIST--------------------------------------
+  const UserList = () => {
+    if (listLoading) return <div className="info">Loading users...</div>;
+    if (listError) return <div className="msg msg-error">{listError}</div>;
+    if (users.length === 0)
+      return <div className="info">No users available.</div>;
+
+    return (
+      <div className="user-list">
+        {users.map((u) => (
+          <div key={u.ID} className="user-card">
+            <div className="user-top">
+              <span className="user-name">{u.name}</span>
+              <span
+                className={`user-status ${u.isActive ? "active" : "inactive"}`}
+              >
+                {u.isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+
+            <p className="email">{u.email}</p>
+
+            <div className="user-footer">
+              <span className="role">{u.role}</span>
+            </div>
+
+            {admin && (
+              <div className="action-row">
+                <button className="edit-btn" onClick={() => startEdit(u)}>
+                  <FontAwesomeIcon icon={faPen} />
+                </button>
+                <button className="delete-btn" onClick={() => deleteUser(u.ID)}>
+                  <FontAwesomeIcon icon={faTrash} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className={`page ${!admin ? "not-admin" : ""}`}>
+      <div className="container">
+        <header className="header">
+          <h1>HPSMT</h1>
+          <p className="welcome">Hello, {userInfo?.firstname ?? "Guest"}!</p>
+        </header>
+
+        <div className="grid">
+          {admin && (
+            <div className="card">
+              <h2>{editingId ? "Edit User" : "Add New User"}</h2>
+
+              <MessageDisplay message={message} />
+
+              <form onSubmit={handleSubmit}>
+                <label>Name</label>
+                <input name="name" value={form.name} onChange={handleChange} />
+
+                <label>Email</label>
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                />
+
+                <label>Role</label>
+                <select name="role" value={form.role} onChange={handleChange}>
+                  {ROLES.map((r) => (
+                    <option value={r.value} key={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label>Status</label>
+                <select
+                  name="isActive"
+                  value={form.isActive}
+                  onChange={handleChange}
+                >
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+
+                <button disabled={loading}>
+                  {loading
+                    ? "Saving..."
+                    : editingId
+                      ? "Update User"
+                      : "Create User"}
+                </button>
+              </form>
+            </div>
+          )}
+          <div className="card">
+            <h2>Existing Users ({users.length})</h2>
+            <UserList />
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default App;
+
 ```
 
------
+**NOTE**:  ADD CSS ACCORDING TO YOU
 
-## ⚠️ Verification
+```jsx
+/* Page */
+.page {
+  background: #f3f4f6;
+  min-height: 100vh;
+  padding: 30px;
+}
 
-Access your frontend application route in the browser.
+/* Non-admin layout = single column */
+.not-admin .grid {
+  grid-template-columns: 1fr !important;
+}
 
-  * If successful, API calls will hit your backend.
-  * The final expected error is **`401 Unauthorized`**, confirming all routing, MIME, and CORS configurations are correctly implemented, and only **XSUAA security** remains to be addressed (typically via the App Router).
+.container {
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 20px;
+}
+
+/* Header */
+.header h1 {
+  font-size: 34px;
+  font-weight: bold;
+  color: #222;
+  text-align: center;
+}
+
+.welcome {
+  text-align: center;
+  color: #1e40af;
+  font-size: 20px;
+  margin-top: 8px;
+}
+
+.subtitle {
+  text-align: center;
+  color: gray;
+  margin-top: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 100px;
+  width: 80%;             /* grid width */
+  margin: 0 auto;         /* centers the grid horizontally */
+  height: 80%;
+  padding: 20px;
+  align-items: stretch;    /* makes cards same height */
+}
+
+/* Card */
+.card {
+  background: white;
+  padding: 35px;
+  width: 100%;       /* ensure card covers full grid cell */
+  height: 100%;      /* optional: make it taller */
+  border-radius: 18px;
+  box-shadow: 0 4px 10px #0002;
+}
+
+/* Form */
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #444;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+input{
+  width: 97%;
+}
+
+button {
+  width: 100%;
+  padding: 13px;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+/* Msg */
+.msg {
+  padding: 14px;
+  border-left: 4px solid;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.msg-success {
+  background: #d1fae5;
+  border-color: #059669;
+  color: #065f46;
+}
+
+.msg-error {
+  background: #fee2e2;
+  border-color: #dc2626;
+  color: #7f1d1d;
+}
+
+/* User List */
+.user-list {
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 10px;
+}
+
+.user-card {
+  background: #f8fafc;
+  position: relative;
+  padding-bottom: 50px;
+  border: 1px solid #e5e7eb;
+  padding: 14px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+/* User top row */
+.user-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.user-name {
+  font-weight: 600;
+  color: #111;
+}
+
+.user-status {
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.active {
+  background: #bbf7d0;
+  color: #065f46;
+}
+
+.inactive {
+  background: #fecaca;
+  color: #7f1d1d;
+}
+
+/* Footer line inside user card */
+.user-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 6px;
+  margin-top: 8px;
+  margin-bottom: 15px;
+}
+
+.action-row {
+  margin-top: 0;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn,
+.delete-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  font-size: 16px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: background-color 0.2s, transform 0.1s;
+}
+.edit-btn {
+  background-color: #2563eb;
+}
+.edit-btn:hover {
+  background-color: #1d4ed8;
+}
+
+.delete-btn {
+  background-color: #dc2626;
+}
+.delete-btn:hover {
+  background-color: #b91c1c;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  color: gray;
+  font-size: 13px;
+  margin-top: 40px;
+}
+
+```
+
+Add  root/srv/src/main/java/customer/hpsmt/handlers/UserValidation.java
+
+```jsx
+package customer.hpsmt.handlers;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import com.sap.cds.Result;
+import com.sap.cds.Row;
+
+import com.sap.cds.ql.Select;
+import com.sap.cds.ql.cqn.CqnSelect;
+
+import com.sap.cds.services.cds.CqnService;
+import com.sap.cds.services.handler.EventHandler;
+import com.sap.cds.services.handler.annotations.On;
+import com.sap.cds.services.handler.annotations.ServiceName;
+
+import com.sap.cds.services.persistence.PersistenceService;
+
+import cds.gen.adminservice.AdminService_;
+import cds.gen.adminservice.Users;
+import cds.gen.adminservice.Users_;
+
+@Component
+@ServiceName(AdminService_.CDS_NAME)
+public class UserValidation implements EventHandler {
+
+    @Autowired
+    PersistenceService db;
+     
+    //---------------VALIDATION ON CREATE--------------------------
+    @On(event = CqnService.EVENT_CREATE, entity = Users_.CDS_NAME)
+    private void validateCreate(Users user){
+        if (user==null) return;
+        validateUserInput(user);
+    }
+    //----------------VALIDATION ON UPDATE-------------------------
+    @On(event = CqnService.EVENT_UPDATE, entity = Users_.CDS_NAME)
+    private void validateUpdate(Users user){
+        if (user==null) return;
+        validateUserInput(user);
+    }
+    //---------------VALIDATION OF USER INPU------------------------
+    private void validateUserInput(Users userInput) {
+        String name = userInput.getName();
+        String email = userInput.getEmail();
+        String role = userInput.getRole();
+        String id = userInput.getId();
+    
+        //Name check.
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Name is required.");
+        }
+        if (name.length() < 3) {
+            throw new IllegalArgumentException("Name must be at least 3 characters.");
+        }
+        if (!name.matches("^[A-Za-z ]+$")) {
+            throw new IllegalArgumentException("Name can contain only alphabets and spaces.");
+        }
+    
+        // Email check
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
+    
+        email.trim().toLowerCase();//setting the email to lowercase.
+        userInput.setEmail(email);
+    
+        // Check duplicates (new OR update)
+        if (emailExists(email, id)) {
+            throw new IllegalArgumentException("Email already exists.");
+        }
+    
+        //Role check
+        if (role == null || role.trim().isEmpty()) {
+            throw new IllegalArgumentException("Role must be selected.");
+        }
+    }
+    
+
+    //------------------CHECK IF EMAIL ALREAY EXISTS (EXCEPT SELF)----------------------
+    private boolean emailExists(String email, String excludeId) {
+
+        CqnSelect select = Select.from(Users_.class)
+                .where(u -> u.email().eq(email));
+    
+        Result result = db.run(select);
+        List<Row> rows = result.list();
+    
+        if (rows.isEmpty()) {
+            return false;   // email does not exist
+        }
+    
+        String foundId = rows.get(0).get("ID").toString();
+    
+        // If updating and it's your own record → OK
+        if (excludeId != null && excludeId.equals(foundId)) {
+            return false;
+        }
+    
+        // Otherwise it's someone else's email → duplicate
+        return true;
+    }
+    
+    
+    
+}
+
+```
+
+As we made changes in the package.json  we don’t need to move build from ui/frontend to resources manually and we don’t have to run mbt build and cf deploy seperately we can simply run:
+```bash
+npm run stage
+npm run deploy
+```
